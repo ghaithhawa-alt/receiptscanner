@@ -108,7 +108,7 @@ def send_code(email, name=""):
     sent = False
 
     # Resend.com API - einzige Methode die auf Railway funktioniert
-    resend_key = os.environ.get("RESEND_API_KEY", "re_Ywt58fwb_2qoG6af8tkyiey1B4hpWzHvP")
+    resend_key = os.environ.get("RESEND_API_KEY", "")
     try:
         html_body = f"""<!DOCTYPE html>
 <html><body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
