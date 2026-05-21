@@ -107,11 +107,10 @@ def send_code(email, name=""):
 
     sent = False
 
-    # Resend.com API (funktioniert auf Railway)
-    resend_key = os.environ.get("RESEND_API_KEY", "")
-    if resend_key:
-        try:
-            html_body = f"""<!DOCTYPE html>
+    # Resend.com API - einzige Methode die auf Railway funktioniert
+    resend_key = os.environ.get("RESEND_API_KEY", "re_Ywt58fwb_2qoG6af8tkyiey1B4hpWzHvP")
+    try:
+        html_body = f"""<!DOCTYPE html>
 <html><body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
 <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;">
   <div style="background:#22c55e;padding:24px;text-align:center;">
@@ -126,55 +125,33 @@ def send_code(email, name=""):
         {code}
       </span>
     </div>
-    <p style="color:#888;font-size:.85rem;">
-      Dieser Code ist <strong>10 Minuten</strong> gueltig.
-    </p>
+    <p style="color:#888;font-size:.85rem;">Dieser Code ist 10 Minuten gueltig.</p>
   </div>
 </div>
 </body></html>"""
 
-            body = json.dumps({
-                "from": "ReceiptScanner <onboarding@resend.dev>",
-                "to":   [email],
-                "subject": f"Dein ReceiptScanner Code: {code}",
-                "html": html_body
-            }).encode("utf-8")
+        body = json.dumps({
+            "from":    "ReceiptScanner <onboarding@resend.dev>",
+            "to":      [email],
+            "subject": f"Dein ReceiptScanner Code: {code}",
+            "html":    html_body
+        }).encode("utf-8")
 
-            req = urllib.request.Request(
-                "https://api.resend.com/emails",
-                data=body,
-                headers={
-                    "Authorization": f"Bearer {resend_key}",
-                    "Content-Type":  "application/json"
-                },
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                resp.read()
-            sent = True
-            print(f"[RESEND] Code {code} -> {email}")
-        except Exception as e:
-            print(f"[RESEND FEHLER] {e}")
-
-    # Fallback: Gmail SMTP
-    if not sent and SMTP_EMAIL and SMTP_PASS:
-        try:
-            import smtplib
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = f"Dein ReceiptScanner Code: {code}"
-            msg["From"]    = f"ReceiptScanner <{SMTP_EMAIL}>"
-            msg["To"]      = email
-            msg.attach(MIMEText(f"Dein Code: {code}", "plain"))
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-                s.ehlo(); s.starttls()
-                s.login(SMTP_EMAIL, SMTP_PASS)
-                s.send_message(msg)
-            sent = True
-            print(f"[EMAIL] Code {code} -> {email}")
-        except Exception as e:
-            print(f"[EMAIL FEHLER] {e}")
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=body,
+            headers={
+                "Authorization": f"Bearer {resend_key}",
+                "Content-Type":  "application/json"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            resp.read()
+        sent = True
+        print(f"[EMAIL] Code {code} -> {email}")
+    except Exception as e:
+        print(f"[EMAIL FEHLER] {e}")
 
     print(f"\n{'='*40}\n  CODE fuer {email}: {code}\n{'='*40}\n")
     return code, sent
