@@ -26,14 +26,14 @@ if sys.platform == "win32":
 #  KONFIGURATION - Werte kommen von Railway Umgebungsvariablen
 # ============================================================
 PORT        = int(os.environ.get("PORT", 8080))
-API_KEY     = os.environ.get("ANTHROPIC_API_KEY", "DEIN-KEY-HIER")
+API_KEY     = os.environ.get("ANTHROPIC_API_KEY", "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")
 SMTP_HOST   = "smtp.gmail.com"
 SMTP_PORT   = 587
-SMTP_EMAIL  = os.environ.get("SMTP_EMAIL", "ghaith.hawa.hhg@gmail.com")
-SMTP_PASS   = os.environ.get("SMTP_PASS",  "ctnygdulafwmpxgr")
+SMTP_EMAIL  = os.environ.get("SMTP_EMAIL", "ghaithhawa90@gmail.com")
+SMTP_PASS   = os.environ.get("SMTP_PASS",  "iwjzahbjnniryotp")
 APP_NAME    = "ReceiptScanner"
 APP_URL     = os.environ.get("APP_URL", "http://localhost:8080")
-SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "ghaith.hawa.hhg@gmail.com")
+SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "ghaithhawa90@gmail.com")
 # ============================================================
 # ============================================================
 
