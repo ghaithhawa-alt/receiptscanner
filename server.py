@@ -30,10 +30,11 @@ API_KEY     = os.environ.get("ANTHROPIC_API_KEY", "sk-ant-api03-wBo1IEnj6ZTBetGi
 SMTP_HOST   = "smtp.gmail.com"
 SMTP_PORT   = 587
 SMTP_EMAIL  = os.environ.get("SMTP_EMAIL", "ghaithhawa90@gmail.com")
-SMTP_PASS   = os.environ.get("SMTP_PASS",  "iwjzahbjnniryotp")
+SMTP_PASS   = os.environ.get("SMTP_PASS",  "yihwkgwnttdyemns")
 APP_NAME    = "ReceiptScanner"
 APP_URL     = os.environ.get("APP_URL", "http://localhost:8080")
 SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "ghaithhawa90@gmail.com")
+
 # ============================================================
 # ============================================================
 
