@@ -40,62 +40,6 @@ SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "ghaithhawa90@gmail.com")
 
 DB_FILE = Path(os.environ.get("DB_PATH", str(Path(__file__).parent / "database.json")))
 
-def resource_path(p):
-    if hasattr(sys, '_MEIPASS'):
-        return Path(sys._MEIPASS) / p
-    return Path(__file__).parent / p
-
-# =============================================
-#  DATENBANK (JSON)
-# =============================================
-def db_load():
-    if DB_FILE.exists():
-        try:
-            return json.loads(DB_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {
-        "users":    {},   # email -> user object
-        "sessions": {},   # token -> email
-        "codes":    {},   # email -> {code, expires}
-        "scans":    [],   # alle scans
-    }
-
-def db_save(db):
-    DB_FILE.write_text(json.dumps(db, ensure_ascii=False, indent=2), encoding="utf-8")
-
-def get_user(email):
-    db = db_load()
-    return db["users"].get(email.lower())
-
-def save_user(user):
-    db = db_load()
-    db["users"][user["email"].lower()] = user
-    db_save(db)
-
-def get_session(token):
-    db = db_load()
-    email = db["sessions"].get(token)
-    if not email: return None
-    # Immer frischen User laden
-    user = db["users"].get(email.lower())
-    return user
-
-def create_session(email):
-    token = ''.join(random.choices(string.ascii_letters + string.digits, k=48))
-    db = db_load()
-    db["sessions"][token] = email.lower()
-    db_save(db)
-    return token
-
-def save_scan(scan_data):
-    db = db_load()
-    db["scans"].append(scan_data)
-    db_save(db)
-
-# =============================================
-#  EMAIL CODE SENDEN
-# =============================================
 def send_code(email, name=""):
     code = ''.join(random.choices(string.digits, k=6))
     db   = db_load()
@@ -106,11 +50,11 @@ def send_code(email, name=""):
     db_save(db)
 
     sent = False
+    resend_key = os.environ.get("re_d6Wzv6Cf_L3De6Gv8Nf7KBmS2HjdFtRX7", "")
 
-    # Resend.com API - einzige Methode die auf Railway funktioniert
-    resend_key = os.environ.get("RESEND_API_KEY", "")
-    try:
-        html_body = f"""<!DOCTYPE html>
+    if resend_key:
+        try:
+            html_body = f"""<!DOCTYPE html>
 <html><body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
 <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;">
   <div style="background:#22c55e;padding:24px;text-align:center;">
@@ -130,90 +74,32 @@ def send_code(email, name=""):
 </div>
 </body></html>"""
 
-        body = json.dumps({
-            "from":    "ReceiptScanner <onboarding@resend.dev>",
-            "to":      [email],
-            "subject": f"Dein ReceiptScanner Code: {code}",
-            "html":    html_body
-        }).encode("utf-8")
+            body = json.dumps({
+                "from":    "ReceiptScanner <onboarding@resend.dev>",
+                "to":      [email],
+                "subject": f"Dein ReceiptScanner Code: {code}",
+                "html":    html_body
+            }).encode("utf-8")
 
-        req = urllib.request.Request(
-            "https://api.resend.com/emails",
-            data=body,
-            headers={
-                "Authorization": f"Bearer {resend_key}",
-                "Content-Type":  "application/json"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            resp.read()
-        sent = True
-        print(f"[EMAIL] Code {code} -> {email}")
-    except Exception as e:
-        print(f"[EMAIL FEHLER] {e}")
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=body,
+                headers={
+                    "Authorization": f"Bearer {resend_key}",
+                    "Content-Type":  "application/json"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                resp.read()
+            sent = True
+            print(f"[EMAIL] Code gesendet -> {email}")
+        except Exception as e:
+            print(f"[RESEND FEHLER] {e}")
+    else:
+        print("[EMAIL] Kein RESEND_API_KEY - Code nur im Terminal!")
 
     print(f"\n{'='*40}\n  CODE fuer {email}: {code}\n{'='*40}\n")
-    return code, sent
-
-    sent = False
-    if SMTP_EMAIL and SMTP_PASS:
-        try:
-            import smtplib
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-
-            anrede = f"Hallo {name}," if name else "Hallo,"
-
-            html_body = f"""
-<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px;">
-<div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;">
-  <div style="background:#22c55e;padding:24px;text-align:center;">
-    <h1 style="color:#000;margin:0;font-size:1.4rem;">ReceiptScanner</h1>
-  </div>
-  <div style="padding:32px;">
-    <p style="color:#333;font-size:1rem;">{anrede}</p>
-    <p style="color:#555;margin-bottom:24px;">Dein Login-Code lautet:</p>
-    <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:10px;
-                padding:20px;text-align:center;margin-bottom:24px;">
-      <span style="font-size:2.5rem;font-weight:900;letter-spacing:8px;color:#16a34a;">
-        {code}
-      </span>
-    </div>
-    <p style="color:#888;font-size:.85rem;">
-      Dieser Code ist <strong>10 Minuten</strong> gueltig.<br>
-      Falls du dich nicht angemeldet hast, ignoriere diese Email.
-    </p>
-  </div>
-  <div style="background:#f9f9f9;padding:16px;text-align:center;">
-    <p style="color:#aaa;font-size:.75rem;margin:0;">ReceiptScanner &mdash; Intelligenter Belegscanner</p>
-  </div>
-</div>
-</body>
-</html>"""
-
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = f"Dein ReceiptScanner Code: {code}"
-            msg["From"]    = f"ReceiptScanner <{SMTP_EMAIL}>"
-            msg["To"]      = email
-            msg.attach(MIMEText(f"Dein Code: {code} (10 Minuten gueltig)", "plain"))
-            msg.attach(MIMEText(html_body, "html"))
-
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-                s.ehlo()
-                s.starttls()
-                s.login(SMTP_EMAIL, SMTP_PASS)
-                s.send_message(msg)
-            sent = True
-            print(f"[EMAIL] Code {code} -> {email}")
-        except Exception as e:
-            print(f"[EMAIL FEHLER] {e}")
-
-    print(f"\n{'='*40}")
-    print(f"  CODE fuer {email}: {code}")
-    print(f"{'='*40}\n")
     return code, sent
 
 def test_email():
