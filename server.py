@@ -153,18 +153,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         p = self.path.split("?")[0]
         routes = {
-            "/":          rp("app")/"index.html",
-            "/index.html":rp("app")/"index.html",
-            "/app":       rp("app")/"index.html",
-            "/login":     rp("app")/"login.html",
-            "/login.html":rp("app")/"login.html",
-            "/landing":   rp("app")/"landing.html",
-            "/admin":     rp("admin")/"index.html",
-            "/admin/":    rp("admin")/"index.html",
+            "/":           rp("app")/"landing.html",
+            "/landing":    rp("app")/"landing.html",
+            "/app":        rp("app")/"index.html",
+            "/app/":       rp("app")/"index.html",
+            "/login":      rp("app")/"login.html",
+            "/login.html": rp("app")/"login.html",
+            "/admin":      rp("admin")/"index.html",
+            "/admin/":     rp("admin")/"index.html",
         }
         if p == "/favicon.ico": self.send_response(204); self.end_headers(); return
         if p in routes: self._serve(routes[p]); return
-        # Serve root as landing for unauthenticated
         self._serve(rp("app")/"landing.html")
 
     def _serve(self, fp):
