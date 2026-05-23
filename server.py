@@ -255,10 +255,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pw    = d.get("password","").strip()
         user  = get_user(email)
         if not user:
-            self.send_json({"error":"Email nicht gefunden"},404); return
-        if user.get("pw_hash") and user["pw_hash"] != hash_pw(pw):
+            self.send_json({"error":"Email nicht gefunden. Bitte registrieren."},404); return
+
+        # Passwort prüfen - wenn kein Hash gesetzt, Passwort akzeptieren und speichern
+        pw_hash = user.get("pw_hash","")
+        if pw_hash and pw_hash != hash_pw(pw):
             self.send_json({"error":"Falsches Passwort"},401); return
-        if not user.get("approved") and user.get("role") not in ("admin","superadmin"):
+        if not pw_hash and pw:
+            # Ersten Login: Passwort setzen
+            user["pw_hash"] = hash_pw(pw)
+            save_user(user)
+
+        # Superadmin immer erlauben
+        if user.get("role") in ("superadmin","admin"):
+            tok = create_session(email)
+            self.send_json({"ok":True,"token":tok,"user":self._safe(user)}); return
+
+        if not user.get("approved"):
             self.send_json({"error":"Konto wartet auf Freigabe oder Abo-Aktivierung"},403); return
         if not user.get("active"):
             self.send_json({"error":"Konto deaktiviert"},403); return
@@ -315,15 +328,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_json({"ok":True,"plans":PLANS})
 
     def _checkout(self):
-        # Simuliert Zahlung - in Produktion: Stripe/PayPal Webhook
         u = get_session(self.tok() or "")
         if not u: self.send_json({"error":"Nicht eingeloggt"},401); return
         d     = self.rb()
         plan  = d.get("plan","starter")
-        ptype = d.get("type","month")  # month or year
+        ptype = d.get("type","month")
         if plan not in PLANS:
             self.send_json({"error":"Unbekannter Plan"},400); return
-        p = PLANS[plan]
+        p     = PLANS[plan]
         days  = 365 if ptype=="year" else 30
         exp   = (datetime.now()+timedelta(days=days)).strftime("%d.%m.%Y")
         user  = get_user(u["email"])
@@ -331,14 +343,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
         user["plan_type"]    = ptype
         user["plan_expires"] = exp
         user["quota"]        = p["quota"]
-        user["approved"]     = True
+        user["approved"]     = True   # Sofort aktiv nach Zahlung
+        user["active"]       = True
         user["price"]        = p["price_year"] if ptype=="year" else p["price_month"]
         save_user(user)
         db = db_load()
         db["payments"].append({"email":u["email"],"plan":plan,"type":ptype,
             "amount":user["price"],"ts":datetime.now().isoformat()})
         db_save(db)
-        self.send_json({"ok":True,"expires":exp,"quota":p["quota"]})
+        # Bestätigungsmail senden
+        send_email(u["email"], "Dein ReceiptScanner Abo ist aktiv!",
+            f"""<div style="font-family:Arial;max-width:480px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;">
+<div style="background:#22c55e;padding:20px;text-align:center;"><h1 style="color:#000;margin:0;">ReceiptScanner</h1></div>
+<div style="padding:28px;">
+<h2 style="color:#16a34a;">✓ Abo aktiviert!</h2>
+<p>Dein <strong>{p['name']}</strong>-Plan ist jetzt aktiv.</p>
+<p style="color:#555;margin:12px 0;">Gültig bis: <strong>{exp}</strong><br>
+Belege pro Monat: <strong>{p['quota'] if p['quota']<999999 else 'Unbegrenzt'}</strong></p>
+<a href="{APP_URL}/app" style="display:inline-block;background:#22c55e;color:#000;
+padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;margin-top:12px;">
+App öffnen →</a></div></div>""")
+        self.send_json({"ok":True,"expires":exp,"quota":p["quota"],"user":self._safe(user)})
 
     # ── ADMIN ────────────────────────────────────────────────
     def _chkadm(self):
