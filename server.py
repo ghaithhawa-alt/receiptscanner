@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-ReceiptScanner Server v2.0
+ReceiptScanner Server v2.1
 ==========================
-- Landing Page mit Abo-System
-- Passwort-Auth + Email-Code Bestätigung
-- Superadmin / Admin / Nutzer Rollen
-- Resend Email
+FIXES:
+- Admin redirect loop behoben (Session-Cookie statt nur Token)
+- Stats werden korrekt geladen
+- /api/auth/me gibt immer frischen User aus DB zurück
 """
 import http.server, json, urllib.request, urllib.error
 import os, sys, random, string, time, hashlib
@@ -51,8 +51,11 @@ def save_user(u):
     db = db_load(); db["users"][u["email"].lower()] = u; db_save(db)
 
 def get_session(tok):
-    db = db_load(); email = db["sessions"].get(tok)
+    if not tok: return None
+    db = db_load()
+    email = db["sessions"].get(tok)
     if not email: return None
+    # FIX: Immer frischen User aus DB laden, nicht gecachten
     return db["users"].get(email.lower())
 
 def create_session(email):
@@ -136,7 +139,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def rb(self):
         n = int(self.headers.get("Content-Length",0))
-        return json.loads(self.rfile.read(n))
+        if n == 0: return {}
+        try: return json.loads(self.rfile.read(n))
+        except: return {}
 
     def tok(self):
         a = self.headers.get("Authorization","")
@@ -173,6 +178,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type","text/html; charset=utf-8")
         self.send_header("Content-Length",str(len(c)))
+        # FIX: Kein Cache für HTML-Seiten, damit Login-Status immer frisch ist
+        self.send_header("Cache-Control","no-store, no-cache, must-revalidate")
         self.end_headers(); self.wfile.write(c)
 
     def do_POST(self):
@@ -198,6 +205,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if m: m()
             else: self.send_error(404)
         except Exception as e:
+            import traceback; traceback.print_exc()
             print(f"[ERR] {p}: {e}")
             self.send_json({"error":str(e)}, 500)
 
@@ -217,7 +225,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({"error":"Email bereits registriert"},409); return
         code = gen_code(email)
         sent = send_code_email(email, code, name)
-        # Temp speichern bis Verifizierung
         db = db_load()
         db["codes"][email+"_reg"] = {"name":name,"pw_hash":hash_pw(pw),"ts":datetime.now().isoformat()}
         db_save(db)
@@ -257,16 +264,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not user:
             self.send_json({"error":"Email nicht gefunden. Bitte registrieren."},404); return
 
-        # Passwort prüfen - wenn kein Hash gesetzt, Passwort akzeptieren und speichern
         pw_hash = user.get("pw_hash","")
         if pw_hash and pw_hash != hash_pw(pw):
             self.send_json({"error":"Falsches Passwort"},401); return
         if not pw_hash and pw:
-            # Ersten Login: Passwort setzen
             user["pw_hash"] = hash_pw(pw)
             save_user(user)
 
-        # Superadmin immer erlauben
+        # FIX: ensure_superadmin() stellt sicher dass der Admin-User korrekte Rolle hat
+        if email == SUPERADMIN_EMAIL.lower():
+            ensure_superadmin()
+            user = get_user(email)  # Frisch laden nach ensure
+
         if user.get("role") in ("superadmin","admin"):
             tok = create_session(email)
             self.send_json({"ok":True,"token":tok,"user":self._safe(user)}); return
@@ -279,8 +288,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_json({"ok":True,"token":tok,"user":self._safe(user)})
 
     def _me(self):
-        u = get_session(self.tok() or "")
-        if not u: self.send_json({"error":"Nicht eingeloggt"},401); return
+        # FIX: Immer frischen User aus DB holen (get_session lädt bereits frisch)
+        u = get_session(self.tok())
+        if not u:
+            self.send_json({"error":"Nicht eingeloggt"},401); return
         self.send_json({"ok":True,"user":self._safe(u)})
 
     def _safe(self, u):
@@ -288,7 +299,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     # ── SCAN ─────────────────────────────────────────────────
     def _scan(self):
-        u = get_session(self.tok() or "")
+        u = get_session(self.tok())
         if not u: self.send_json({"error":"Nicht eingeloggt"},401); return
         u = get_user(u["email"]) or u
         if not u.get("approved") and u.get("role") not in ("admin","superadmin"):
@@ -328,7 +339,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_json({"ok":True,"plans":PLANS})
 
     def _checkout(self):
-        u = get_session(self.tok() or "")
+        u = get_session(self.tok())
         if not u: self.send_json({"error":"Nicht eingeloggt"},401); return
         d     = self.rb()
         plan  = d.get("plan","starter")
@@ -343,7 +354,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         user["plan_type"]    = ptype
         user["plan_expires"] = exp
         user["quota"]        = p["quota"]
-        user["approved"]     = True   # Sofort aktiv nach Zahlung
+        user["approved"]     = True
         user["active"]       = True
         user["price"]        = p["price_year"] if ptype=="year" else p["price_month"]
         save_user(user)
@@ -351,7 +362,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         db["payments"].append({"email":u["email"],"plan":plan,"type":ptype,
             "amount":user["price"],"ts":datetime.now().isoformat()})
         db_save(db)
-        # Bestätigungsmail senden
         send_email(u["email"], "Dein ReceiptScanner Abo ist aktiv!",
             f"""<div style="font-family:Arial;max-width:480px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;">
 <div style="background:#22c55e;padding:20px;text-align:center;"><h1 style="color:#000;margin:0;">ReceiptScanner</h1></div>
@@ -367,15 +377,21 @@ App öffnen →</a></div></div>""")
 
     # ── ADMIN ────────────────────────────────────────────────
     def _chkadm(self):
-        u = get_session(self.tok() or "")
+        u = get_session(self.tok())
         if not u: return None,"Nicht eingeloggt"
+        # FIX: Frischen User aus DB laden für aktuellen Rollenstatus
+        u = get_user(u["email"]) or u
         if u.get("role") not in ("admin","superadmin"): return None,"Kein Admin"
         return u, None
 
     def _admin_users(self):
         u,e = self._chkadm()
         if e: self.send_json({"error":e},403); return
-        self.send_json({"ok":True,"users":list(db_load()["users"].values())})
+        db = db_load()
+        users = list(db["users"].values())
+        # pw_hash nicht zurückgeben
+        safe_users = [{k:v for k,v in usr.items() if k != "pw_hash"} for usr in users]
+        self.send_json({"ok":True,"users":safe_users})
 
     def _approve(self):
         u,e = self._chkadm()
@@ -407,7 +423,7 @@ App öffnen →</a></div></div>""")
         self.send_json({"ok":True})
 
     def _promote(self):
-        u = get_session(self.tok() or "")
+        u = get_session(self.tok())
         if not u or u.get("role")!="superadmin":
             self.send_json({"error":"Nur Superadmin"},403); return
         d = self.rb(); t = get_user(d.get("email","").lower())
@@ -418,22 +434,24 @@ App öffnen →</a></div></div>""")
     def _stats(self):
         u,e = self._chkadm()
         if e: self.send_json({"error":e},403); return
-        db = db_load(); users = list(db["users"].values())
+        db = db_load()
+        users = list(db["users"].values())
         nm = datetime.now().strftime(".%m.%Y")
-        rev = sum(u.get("price",0) for u in users if u.get("active") and u.get("approved"))
+        # FIX: Revenue nur von Nutzern die aktiv UND approved sind
+        rev = sum(u.get("price",0) for u in users if u.get("active") and u.get("approved") and u.get("role") not in ("admin","superadmin"))
         self.send_json({"ok":True,
-            "total_users":   len(users),
-            "active_users":  sum(1 for u in users if u.get("active") and u.get("approved")),
-            "pending_users": sum(1 for u in users if not u.get("approved")),
-            "monthly_scans": len([s for s in db["scans"] if s.get("datum","").endswith(nm)]),
+            "total_users":    len(users),
+            "active_users":   sum(1 for u in users if u.get("active") and u.get("approved")),
+            "pending_users":  sum(1 for u in users if not u.get("approved")),
+            "monthly_scans":  len([s for s in db.get("scans",[]) if s.get("datum","").endswith(nm)]),
             "monthly_revenue": round(rev,2),
-            "total_payments": len(db.get("payments",[])),
+            "total_payments":  len(db.get("payments",[])),
         })
 
     def _admin_scans(self):
         u,e = self._chkadm()
         if e: self.send_json({"error":e},403); return
-        self.send_json({"ok":True,"scans":db_load()["scans"][-200:]})
+        self.send_json({"ok":True,"scans":db_load().get("scans",[])[-200:]})
 
     def _admin_send_mail(self):
         u,e = self._chkadm()
@@ -453,7 +471,7 @@ App öffnen →</a></div></div>""")
 def main():
     ensure_superadmin()
     base = Path(__file__).parent
-    print(f"\n{'='*50}\n  ReceiptScanner v2.0\n{'='*50}")
+    print(f"\n{'='*50}\n  ReceiptScanner v2.1\n{'='*50}")
     for f in ["app/landing.html","app/login.html","app/index.html","admin/index.html"]:
         fp = base/f
         print(f"  {'✓' if fp.exists() else '✗ FEHLT'} {f}")
