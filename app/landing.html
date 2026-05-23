@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReceiptScanner — Intelligente Belegerfassung</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#060908;--s1:#0c110d;--s2:#111712;--s3:#182018;
+  --g:#22c55e;--g2:#16a34a;--g3:#bbf7d0;
+  --glow:rgba(34,197,94,0.1);--b:rgba(34,197,94,0.16);--b2:rgba(34,197,94,0.07);
+  --t:#e8f5e9;--sub:#6b9f78;--red:#f87171;--y:#fbbf24;
+}
+html{scroll-behavior:smooth;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t);overflow-x:hidden;}
+a{text-decoration:none;color:inherit;}
+
+/* COOKIE */
+#ck{position:fixed;bottom:0;left:0;right:0;z-index:999;
+  background:var(--s2);border-top:1px solid var(--b2);
+  padding:14px 32px;display:flex;align-items:center;
+  justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.ck-t{font-size:.8rem;color:var(--sub);max-width:600px;line-height:1.5;}
+.ck-t a{color:var(--g);}
+.ck-btns{display:flex;gap:8px;}
+.ck-ok{height:34px;padding:0 18px;background:var(--g);color:#000;border:none;
+  border-radius:7px;font-weight:700;font-size:.78rem;cursor:pointer;}
+.ck-no{height:34px;padding:0 14px;background:transparent;
+  border:1px solid var(--b);color:var(--sub);border-radius:7px;font-size:.78rem;cursor:pointer;}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:62px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(6,9,8,.92);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--b2);}
+.logo{display:flex;align-items:center;gap:9px;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--g);}
+.logo-box{width:30px;height:30px;background:var(--g);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;}
+.logo-box svg{stroke:#000;fill:none;stroke-width:2.2;stroke-linecap:round;}
+.nav-links{display:flex;align-items:center;gap:26px;}
+.nav-links a{font-size:.83rem;color:var(--sub);transition:color .2s;}
+.nav-links a:hover{color:var(--t);}
+.nav-r{display:flex;gap:9px;align-items:center;}
+.nav-login{height:36px;padding:0 16px;background:transparent;
+  border:1px solid var(--b);color:var(--t);border-radius:8px;
+  font-size:.8rem;cursor:pointer;transition:all .2s;}
+.nav-login:hover{border-color:var(--g);color:var(--g);}
+.nav-start{height:36px;padding:0 18px;background:var(--g);color:#000;
+  border:none;border-radius:8px;font-family:'Syne',sans-serif;
+  font-weight:700;font-size:.8rem;cursor:pointer;transition:all .2s;}
+.nav-start:hover{background:var(--g2);}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:80px 24px 60px;position:relative;overflow:hidden;}
+.hero-bg{position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 900px 700px at 50% 20%,rgba(34,197,94,0.07),transparent 65%),
+    radial-gradient(ellipse 400px 600px at 5% 80%,rgba(34,197,94,0.04),transparent 65%),
+    radial-gradient(ellipse 400px 400px at 95% 30%,rgba(34,197,94,0.04),transparent 65%);}
+.hero-inner{position:relative;z-index:1;max-width:820px;margin:0 auto;}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;
+  font-size:.7rem;font-weight:600;color:var(--g);
+  background:var(--glow);border:1px solid var(--b);border-radius:20px;
+  padding:5px 14px;margin-bottom:28px;letter-spacing:.07em;text-transform:uppercase;}
+.hero-badge span{width:6px;height:6px;border-radius:50%;background:var(--g);
+  box-shadow:0 0 8px var(--g);display:inline-block;}
+.hero h1{font-family:'Syne',sans-serif;font-weight:800;
+  font-size:clamp(2.8rem,7vw,5.2rem);line-height:1.0;
+  letter-spacing:-.04em;margin-bottom:22px;}
+.hero h1 .gr{color:var(--g);}
+.hero h1 .dim{color:var(--sub);}
+.hero-p{color:var(--sub);font-size:1rem;font-weight:300;
+  max-width:520px;margin:0 auto 40px;line-height:1.7;}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:60px;}
+.btn-main{height:52px;padding:0 28px;background:var(--g);color:#000;
+  border:none;border-radius:12px;font-family:'Syne',sans-serif;
+  font-weight:700;font-size:.95rem;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;gap:8px;}
+.btn-main:hover{background:var(--g2);transform:translateY(-2px);box-shadow:0 10px 30px rgba(34,197,94,.25);}
+.btn-main svg{stroke:#000;fill:none;stroke-width:2;stroke-linecap:round;width:18px;height:18px;}
+.btn-ghost-lg{height:52px;padding:0 24px;background:transparent;
+  border:1px solid var(--b);color:var(--t);border-radius:12px;
+  font-size:.9rem;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px;}
+.btn-ghost-lg:hover{border-color:var(--g);color:var(--g);}
+.btn-ghost-lg svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;width:16px;height:16px;}
+
+/* HERO STATS */
+.hero-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  max-width:680px;margin:0 auto;
+  background:var(--s2);border:1px solid var(--b2);border-radius:16px;overflow:hidden;}
+.hs{padding:20px 16px;text-align:center;border-right:1px solid var(--b2);}
+.hs:last-child{border-right:none;}
+.hs-num{font-family:'Syne',sans-serif;font-weight:800;font-size:1.6rem;
+  color:var(--g);letter-spacing:-.03em;line-height:1;}
+.hs-lbl{font-size:.7rem;color:var(--sub);margin-top:4px;}
+
+/* SECTIONS */
+.section{padding:90px 24px;max-width:1100px;margin:0 auto;}
+.s-tag{font-size:.7rem;font-weight:600;color:var(--g);
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;}
+.s-title{font-family:'Syne',sans-serif;font-weight:800;
+  font-size:clamp(1.8rem,4vw,2.8rem);letter-spacing:-.03em;
+  margin-bottom:12px;line-height:1.1;}
+.s-sub{color:var(--sub);font-size:.9rem;max-width:460px;line-height:1.7;}
+
+/* FEATURES */
+.f-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:52px;}
+.f-card{background:var(--s2);border:1px solid var(--b2);border-radius:16px;
+  padding:26px;transition:all .28s;cursor:default;}
+.f-card:hover{border-color:var(--b);transform:translateY(-3px);
+  box-shadow:0 14px 40px rgba(34,197,94,.07);}
+.f-icon{width:44px;height:44px;background:var(--glow);border:1px solid var(--b);
+  border-radius:11px;display:flex;align-items:center;justify-content:center;
+  margin-bottom:14px;}
+.f-icon svg{width:20px;height:20px;stroke:var(--g);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.f-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;margin-bottom:7px;}
+.f-desc{font-size:.8rem;color:var(--sub);line-height:1.6;}
+
+/* HOW IT WORKS */
+.how{background:var(--s1);padding:90px 24px;
+  border-top:1px solid var(--b2);border-bottom:1px solid var(--b2);}
+.how-inner{max-width:1000px;margin:0 auto;}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  margin-top:52px;position:relative;}
+.steps::before{content:'';position:absolute;top:27px;left:12%;right:12%;
+  height:1px;background:linear-gradient(90deg,transparent,var(--b),var(--b),transparent);}
+.step{text-align:center;padding:0 12px;position:relative;z-index:1;}
+.step-n{width:54px;height:54px;border-radius:50%;border:2px solid var(--b);
+  background:var(--s2);display:flex;align-items:center;justify-content:center;
+  margin:0 auto 14px;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;color:var(--sub);}
+.step.on .step-n{background:var(--g);color:#000;border-color:var(--g);
+  box-shadow:0 0 24px rgba(34,197,94,.3);}
+.step-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;margin-bottom:5px;}
+.step-desc{font-size:.76rem;color:var(--sub);line-height:1.5;}
+
+/* PRICING */
+.pricing{padding:90px 24px;max-width:1100px;margin:0 auto;}
+.price-toggle{display:flex;align-items:center;justify-content:center;
+  gap:12px;margin:28px 0 44px;}
+.pt-lbl{font-size:.83rem;color:var(--sub);}
+.pt-lbl.on{color:var(--t);font-weight:600;}
+.toggle{width:46px;height:24px;background:var(--s3);border:1px solid var(--b);
+  border-radius:12px;cursor:pointer;position:relative;transition:background .2s;}
+.toggle.active{background:var(--g);}
+.toggle-dot{position:absolute;top:2px;left:2px;width:18px;height:18px;
+  background:#fff;border-radius:50%;transition:transform .2s;}
+.toggle.active .toggle-dot{transform:translateX(22px);}
+.save-badge{font-size:.62rem;font-weight:700;padding:2px 8px;
+  background:rgba(34,197,94,.12);border:1px solid var(--b);
+  color:var(--g);border-radius:20px;letter-spacing:.04em;}
+
+.p-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+.p-card{background:var(--s2);border:1px solid var(--b2);
+  border-radius:20px;padding:30px;position:relative;transition:all .3s;}
+.p-card:hover{transform:translateY(-4px);}
+.p-card.pop{border-color:var(--g);box-shadow:0 0 48px rgba(34,197,94,.1);}
+.p-badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+  background:var(--g);color:#000;font-size:.65rem;font-weight:800;
+  padding:3px 14px;border-radius:20px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;}
+.p-name{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;margin-bottom:3px;}
+.p-desc{font-size:.76rem;color:var(--sub);margin-bottom:22px;}
+.p-price{font-family:'Syne',sans-serif;font-weight:800;
+  font-size:2.8rem;letter-spacing:-.04em;color:var(--g);line-height:1;}
+.p-price sub{font-size:1rem;font-weight:400;color:var(--sub);vertical-align:middle;}
+.p-per{font-size:.76rem;color:var(--sub);margin:4px 0 6px;}
+.p-annual{font-size:.72rem;color:var(--g);min-height:16px;margin-bottom:22px;}
+.p-feats{list-style:none;margin-bottom:26px;}
+.p-feats li{display:flex;align-items:flex-start;gap:8px;
+  font-size:.8rem;color:var(--sub);padding:6px 0;
+  border-bottom:1px solid var(--b2);}
+.p-feats li:last-child{border-bottom:none;}
+.p-feats li::before{content:'';width:16px;height:16px;flex-shrink:0;margin-top:1px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' stroke='%2322c55e' fill='none' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center/contain no-repeat;}
+.p-btn{width:100%;height:46px;border:none;border-radius:11px;
+  font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;cursor:pointer;transition:all .2s;}
+.p-btn.green{background:var(--g);color:#000;}
+.p-btn.green:hover{background:var(--g2);}
+.p-btn.ghost{background:var(--s3);border:1px solid var(--b);color:var(--t);}
+.p-btn.ghost:hover{border-color:var(--g);color:var(--g);}
+
+/* TESTIMONIALS */
+.testi{background:var(--s1);padding:80px 24px;
+  border-top:1px solid var(--b2);border-bottom:1px solid var(--b2);}
+.t-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+  max-width:1000px;margin:44px auto 0;}
+.t-card{background:var(--s2);border:1px solid var(--b2);border-radius:14px;padding:22px;}
+.t-stars{color:var(--g);font-size:.85rem;margin-bottom:10px;letter-spacing:2px;}
+.t-text{font-size:.82rem;color:var(--sub);line-height:1.65;margin-bottom:14px;font-style:italic;}
+.t-name{font-size:.78rem;font-weight:700;}
+.t-role{font-size:.7rem;color:var(--sub);}
+
+/* FAQ */
+.faq{padding:80px 24px;max-width:700px;margin:0 auto;}
+.faq-item{border-bottom:1px solid var(--b2);}
+.faq-q{display:flex;align-items:center;justify-content:space-between;
+  padding:18px 0;cursor:pointer;font-family:'Syne',sans-serif;
+  font-weight:700;font-size:.92rem;gap:12px;}
+.faq-q svg{stroke:var(--sub);fill:none;stroke-width:2;stroke-linecap:round;
+  width:16px;height:16px;flex-shrink:0;transition:transform .2s;}
+.faq-item.open .faq-q svg{transform:rotate(180deg);}
+.faq-a{font-size:.82rem;color:var(--sub);line-height:1.7;
+  max-height:0;overflow:hidden;transition:max-height .3s,padding .3s;}
+.faq-item.open .faq-a{max-height:200px;padding-bottom:16px;}
+
+/* CTA BANNER */
+.cta-banner{
+  background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(34,197,94,.04));
+  border:1px solid var(--b);border-radius:24px;padding:60px 40px;
+  text-align:center;margin:0 24px 80px;max-width:1052px;margin:0 auto 80px;
+}
+.cta-banner h2{font-family:'Syne',sans-serif;font-weight:800;
+  font-size:clamp(1.6rem,3vw,2.4rem);margin-bottom:10px;}
+.cta-banner p{color:var(--sub);font-size:.9rem;margin-bottom:28px;}
+
+/* FOOTER */
+footer{background:var(--s1);border-top:1px solid var(--b2);padding:56px 40px 32px;}
+.f-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;
+  max-width:1100px;margin:0 auto 40px;}
+.f-brand-desc{font-size:.78rem;color:var(--sub);line-height:1.6;max-width:240px;margin-top:10px;}
+.f-col h4{font-family:'Syne',sans-serif;font-weight:700;font-size:.75rem;
+  margin-bottom:14px;color:var(--t);letter-spacing:.05em;text-transform:uppercase;}
+.f-col a{display:block;font-size:.78rem;color:var(--sub);margin-bottom:8px;transition:color .2s;}
+.f-col a:hover{color:var(--g);}
+.f-bottom{max-width:1100px;margin:0 auto;display:flex;align-items:center;
+  justify-content:space-between;padding-top:24px;border-top:1px solid var(--b2);
+  font-size:.72rem;color:var(--sub);flex-wrap:wrap;gap:8px;}
+
+/* ANIM */
+.fade-up{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease;}
+.fade-up.in{opacity:1;transform:translateY(0);}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  nav{padding:0 16px;} .nav-links{display:none;}
+  .f-grid{grid-template-columns:repeat(2,1fr);}
+  .steps{grid-template-columns:1fr 1fr;gap:24px;} .steps::before{display:none;}
+  .p-grid{grid-template-columns:1fr;}
+  .t-grid{grid-template-columns:1fr;}
+  .hero-stats{grid-template-columns:repeat(2,1fr);}
+  .hs:nth-child(2){border-right:none;}
+  .hs:nth-child(1),.hs:nth-child(2){border-bottom:1px solid var(--b2);}
+}
+</style>
+</head>
+<body>
+
+<!-- COOKIE -->
+<div id="ck">
+  <div class="ck-t">Wir verwenden Cookies für die beste Nutzererfahrung. Mehr dazu in unserer <a href="#">Datenschutzerklärung</a>.</div>
+  <div class="ck-btns">
+    <button class="ck-no" onclick="this.closest('#ck').style.display='none';localStorage.setItem('ck','0')">Ablehnen</button>
+    <button class="ck-ok" onclick="this.closest('#ck').style.display='none';localStorage.setItem('ck','1')">Alle akzeptieren</button>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="logo">
+    <div class="logo-box">
+      <svg viewBox="0 0 24 24" width="16" height="16"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>
+    </div>
+    ReceiptScanner
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how">Wie es funktioniert</a>
+    <a href="#pricing">Preise</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <div class="nav-r">
+    <a href="/login" class="nav-login">Anmelden</a>
+    <a href="#pricing" class="nav-start">Kostenlos testen</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-inner">
+    <div class="hero-badge"><span></span> Powered by Claude AI · DSGVO-konform</div>
+    <h1>Belege erfassen.<br><span class="gr">Automatisch.</span><br><span class="dim">In Sekunden.</span></h1>
+    <p class="hero-p">Fotografiere oder lade Kassenbons hoch — ReceiptScanner liest Datum, Betrag, MwSt und Lieferant automatisch aus. Exportiere alles sortiert als Excel.</p>
+    <div class="hero-btns">
+      <a href="/login?mode=register" class="btn-main">
+        <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        3 Tage kostenlos starten
+      </a>
+      <a href="#how" class="btn-ghost-lg">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>
+        Wie es funktioniert
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div class="hs"><div class="hs-num">3s</div><div class="hs-lbl">Pro Beleg</div></div>
+      <div class="hs"><div class="hs-num">99%</div><div class="hs-lbl">Genauigkeit</div></div>
+      <div class="hs"><div class="hs-num">Excel</div><div class="hs-lbl">1-Klick Export</div></div>
+      <div class="hs"><div class="hs-num">DSGVO</div><div class="hs-lbl">Konform</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section fade-up" id="features">
+  <div class="s-tag">Features</div>
+  <h2 class="s-title">Alles was du brauchst</h2>
+  <p class="s-sub">Von der Kameraaufnahme bis zum Monatsabschluss — alles in einer App.</p>
+  <div class="f-grid">
+    <div class="f-card fade-up">
+      <div class="f-icon"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/></svg></div>
+      <div class="f-title">Blitzschnell</div>
+      <div class="f-desc">Jeder Beleg wird in unter 3 Sekunden vollständig ausgelesen — Datum, Betrag, MwSt, Lieferant.</div>
+    </div>
+    <div class="f-card fade-up">
+      <div class="f-icon"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+      <div class="f-icon" style="display:none;"></div>
+      <div class="f-title">Kamera & Upload</div>
+      <div class="f-desc">Direkt mit dem Handy fotografieren oder Dateien hochladen — JPG, PNG, PDF, TIFF.</div>
+    </div>
+    <div class="f-card fade-up">
+      <div class="f-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+      <div class="f-title">Excel Export</div>
+      <div class="f-desc">Alle Belege mit einem Klick als Excel-Datei — sortiert nach Datum, kompatibel mit DATEV & Co.</div>
+    </div>
+    <div class="f-card fade-up">
+      <div class="f-icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="f-title">Scan-Ordner</div>
+      <div class="f-desc">Belege werden automatisch nach Monat gruppiert. Excel-Export pro Monat mit einem Klick.</div>
+    </div>
+    <div class="f-card fade-up">
+      <div class="f-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+      <div class="f-title">Berichte & Statistiken</div>
+      <div class="f-desc">Ausgaben-Übersicht, Monatszusammenfassung und Diagramme für bessere Kontrolle.</div>
+    </div>
+    <div class="f-card fade-up">
+      <div class="f-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <div class="f-title">Sicher & DSGVO-konform</div>
+      <div class="f-desc">SSL-verschlüsselt, keine Bildspeicherung, vollständig DSGVO-konform nach deutschem Recht.</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<div class="how fade-up" id="how">
+  <div class="how-inner">
+    <div style="text-align:center;">
+      <div class="s-tag">So funktioniert es</div>
+      <h2 class="s-title">In 4 Schritten fertig</h2>
+    </div>
+    <div class="steps">
+      <div class="step on">
+        <div class="step-n">1</div>
+        <div class="step-title">Konto erstellen</div>
+        <div class="step-desc">Email und Passwort eingeben, Code bestätigen.</div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-title">Abo wählen</div>
+        <div class="step-desc">Plan auswählen und sofort loslegen.</div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-title">Belege hochladen</div>
+        <div class="step-desc">Foto machen oder Datei hochladen.</div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-title">Excel exportieren</div>
+        <div class="step-desc">Alle Daten sortiert in einem Klick.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRICING -->
+<section class="pricing fade-up" id="pricing">
+  <div style="text-align:center;">
+    <div class="s-tag">Preise</div>
+    <h2 class="s-title">Transparent & fair</h2>
+    <p class="s-sub" style="margin:0 auto;">3 Tage kostenlos testen — keine Kreditkarte nötig.</p>
+  </div>
+  <div class="price-toggle">
+    <span class="pt-lbl on" id="lbl-m">Monatlich</span>
+    <div class="toggle" id="tog" onclick="toggleBilling()"><div class="toggle-dot"></div></div>
+    <span class="pt-lbl" id="lbl-y">Jährlich <span class="save-badge">19% günstiger</span></span>
+  </div>
+  <div class="p-grid">
+    <div class="p-card fade-up">
+      <div class="p-name">Starter</div>
+      <div class="p-desc">Für Einzelpersonen</div>
+      <div class="p-price" id="pr-s">5,99<sub>€</sub></div>
+      <div class="p-per">/Monat</div>
+      <div class="p-annual" id="an-s"></div>
+      <ul class="p-feats">
+        <li>500 Belege pro Monat</li>
+        <li>Claude AI Erkennung</li>
+        <li>Excel Export</li>
+        <li>Scan-Ordner</li>
+        <li>Email Support</li>
+      </ul>
+      <button class="p-btn ghost" onclick="goLogin('starter')">3 Tage kostenlos testen</button>
+    </div>
+    <div class="p-card pop fade-up">
+      <div class="p-badge">Beliebteste Wahl</div>
+      <div class="p-name">Pro</div>
+      <div class="p-desc">Für wachsende Unternehmen</div>
+      <div class="p-price" id="pr-p">11,99<sub>€</sub></div>
+      <div class="p-per">/Monat</div>
+      <div class="p-annual" id="an-p"></div>
+      <ul class="p-feats">
+        <li>1.000 Belege pro Monat</li>
+        <li>Claude AI Erkennung</li>
+        <li>Excel Export</li>
+        <li>Scan-Ordner</li>
+        <li>Berichte & Statistiken</li>
+        <li>Prioritäts-Support</li>
+      </ul>
+      <button class="p-btn green" onclick="goLogin('pro')">Jetzt starten</button>
+    </div>
+    <div class="p-card fade-up">
+      <div class="p-name">Business</div>
+      <div class="p-desc">Für große Teams</div>
+      <div class="p-price" id="pr-b">89,99<sub>€</sub></div>
+      <div class="p-per">/Monat</div>
+      <div class="p-annual" id="an-b"></div>
+      <ul class="p-feats">
+        <li>Unbegrenzte Belege</li>
+        <li>Claude AI Erkennung</li>
+        <li>Excel Export</li>
+        <li>Scan-Ordner</li>
+        <li>Team-Verwaltung</li>
+        <li>Dedizierter Support</li>
+        <li>API-Zugang</li>
+      </ul>
+      <button class="p-btn ghost" onclick="goLogin('business')">Kontakt aufnehmen</button>
+    </div>
+  </div>
+  <p style="text-align:center;margin-top:20px;font-size:.76rem;color:var(--sub);">
+    Alle Preise inkl. 19% MwSt. · Jederzeit kündbar · SSL-verschlüsselt
+  </p>
+</section>
+
+<!-- TESTIMONIALS -->
+<div class="testi fade-up">
+  <div style="text-align:center;max-width:1100px;margin:0 auto;">
+    <div class="s-tag">Bewertungen</div>
+    <h2 class="s-title">Was Kunden sagen</h2>
+  </div>
+  <div class="t-grid">
+    <div class="t-card fade-up">
+      <div class="t-stars">★★★★★</div>
+      <div class="t-text">"Spart uns täglich 2 Stunden. Früher haben wir alles manuell eingetippt — jetzt macht das die App in Sekunden."</div>
+      <div class="t-name">Markus Weber</div>
+      <div class="t-role">Fuhrparkleiter, Weber Logistik GmbH</div>
+    </div>
+    <div class="t-card fade-up">
+      <div class="t-stars">★★★★★</div>
+      <div class="t-text">"Die Genauigkeit ist beeindruckend. Selbst schlechte Handyfotos werden korrekt ausgelesen. Absolut empfehlenswert."</div>
+      <div class="t-name">Sandra Müller</div>
+      <div class="t-role">Buchhalterin, Steuerberatung Müller</div>
+    </div>
+    <div class="t-card fade-up">
+      <div class="t-stars">★★★★★</div>
+      <div class="t-text">"Endlich eine App die wirklich funktioniert. MwSt-Berechnung, Datum, Lieferant — alles stimmt auf Anhieb."</div>
+      <div class="t-name">Thomas Klein</div>
+      <div class="t-role">Selbstständiger Handwerker</div>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<section class="faq fade-up" id="faq">
+  <div style="text-align:center;margin-bottom:44px;">
+    <div class="s-tag">FAQ</div>
+    <h2 class="s-title">Häufige Fragen</h2>
+  </div>
+  <div id="faq-list"></div>
+</section>
+
+<!-- CTA -->
+<div style="padding:0 24px 80px;max-width:1100px;margin:0 auto;" class="fade-up">
+  <div class="cta-banner">
+    <h2>Jetzt kostenlos starten</h2>
+    <p>3 Tage gratis testen — keine Kreditkarte, jederzeit kündbar.</p>
+    <a href="/login?mode=register" class="btn-main" style="display:inline-flex;">
+      <svg viewBox="0 0 24 24" width="18" height="18" stroke="#000" fill="none" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      Kostenlos registrieren
+    </a>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="f-grid">
+    <div>
+      <a href="/" class="logo" style="margin-bottom:10px;display:inline-flex;">
+        <div class="logo-box"><svg viewBox="0 0 24 24" width="16" height="16" stroke="#000" fill="none" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></div>
+        ReceiptScanner
+      </a>
+      <div class="f-brand-desc">Intelligente Belegerfassung für Unternehmen jeder Größe. Powered by Claude AI.</div>
+    </div>
+    <div class="f-col">
+      <h4>Produkt</h4>
+      <a href="#features">Features</a>
+      <a href="#pricing">Preise</a>
+      <a href="#how">Wie es funktioniert</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="f-col">
+      <h4>Konto</h4>
+      <a href="/login">Anmelden</a>
+      <a href="/login?mode=register">Registrieren</a>
+      <a href="/app">App öffnen</a>
+    </div>
+    <div class="f-col">
+      <h4>Rechtliches</h4>
+      <a href="#">Datenschutz</a>
+      <a href="#">AGB</a>
+      <a href="#">Impressum</a>
+      <a href="#">Cookie-Einstellungen</a>
+    </div>
+  </div>
+  <div class="f-bottom">
+    <span>© 2026 ReceiptScanner. Alle Rechte vorbehalten.</span>
+    <span>Made with ♥ in Germany</span>
+  </div>
+</footer>
+
+<script>
+// Cookie
+if(localStorage.getItem('ck')) document.getElementById('ck').style.display='none';
+
+// Billing toggle
+let yearly=false;
+const prices={starter:{m:5.99,y:57.99},pro:{m:11.99,y:115.99},business:{m:89.99,y:869.99}};
+function toggleBilling(){
+  yearly=!yearly;
+  document.getElementById('tog').classList.toggle('active',yearly);
+  document.getElementById('lbl-m').classList.toggle('on',!yearly);
+  document.getElementById('lbl-y').classList.toggle('on',yearly);
+  const fmt=n=>n.toFixed(2).replace('.',',');
+  document.getElementById('pr-s').innerHTML=`${fmt(yearly?prices.starter.y/12:prices.starter.m)}<sub>€</sub>`;
+  document.getElementById('pr-p').innerHTML=`${fmt(yearly?prices.pro.y/12:prices.pro.m)}<sub>€</sub>`;
+  document.getElementById('pr-b').innerHTML=`${fmt(yearly?prices.business.y/12:prices.business.m)}<sub>€</sub>`;
+  document.getElementById('an-s').textContent=yearly?`${prices.starter.y.toFixed(2).replace('.',',')}€ / Jahr`:'';
+  document.getElementById('an-p').textContent=yearly?`${prices.pro.y.toFixed(2).replace('.',',')}€ / Jahr`:'';
+  document.getElementById('an-b').textContent=yearly?`${prices.business.y.toFixed(2).replace('.',',')}€ / Jahr`:'';
+}
+
+function goLogin(plan){
+  const tok=localStorage.getItem('rs_token');
+  if(tok) window.location.href=`/app?plan=${plan}&type=${yearly?'year':'month'}`;
+  else window.location.href=`/login?mode=register&plan=${plan}&type=${yearly?'year':'month'}`;
+}
+
+// FAQ
+const faqs=[
+  {q:'Wie lange ist der Testzeitraum?',a:'3 Tage kostenlos — keine Kreditkarte nötig. Nach dem Test wählst du ein Abo oder die App ist einfach nicht mehr nutzbar.'},
+  {q:'Welche Dateiformate werden unterstützt?',a:'JPG, PNG, PDF und TIFF. Auch Handyfotos in niedriger Qualität werden zuverlässig erkannt.'},
+  {q:'Wie sicher sind meine Daten?',a:'Alle Übertragungen sind SSL-verschlüsselt. Bilddaten werden nicht gespeichert. Vollständig DSGVO-konform.'},
+  {q:'Kann ich jederzeit kündigen?',a:'Ja, jederzeit ohne Fristen. Das Abo läuft bis zum Ende des bezahlten Zeitraums.'},
+  {q:'Funktioniert die App auch auf dem Handy?',a:'Ja, vollständig. Du kannst direkt mit der Handykamera fotografieren und sofort auslesen lassen.'},
+  {q:'Gibt es einen Team-Plan?',a:'Ja, der Business-Plan unterstützt unbegrenzte Belege. Kontaktiere uns für individuelle Angebote.'},
+];
+const fl=document.getElementById('faq-list');
+faqs.forEach((f,i)=>{
+  const d=document.createElement('div');
+  d.className='faq-item';
+  d.innerHTML=`<div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+    <span>${f.q}</span>
+    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+  </div><div class="faq-a">${f.a}</div>`;
+  fl.appendChild(d);
+});
+
+// Scroll animations
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in');});
+},{threshold:0.08});
+document.querySelectorAll('.fade-up').forEach(el=>obs.observe(el));
+
+// Auto-login check
+(async()=>{
+  const tok=localStorage.getItem('rs_token');
+  if(!tok) return;
+  try{
+    const r=await fetch('/api/auth/me',{method:'POST',
+      headers:{'Authorization':`Bearer ${tok}`,'Content-Type':'application/json'},body:'{}'});
+    if(r.ok){
+      const navR=document.querySelector('.nav-r');
+      navR.innerHTML=`<a href="/app" class="nav-login">App öffnen</a>
+        <a href="/admin" class="nav-start">Admin</a>`;
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
